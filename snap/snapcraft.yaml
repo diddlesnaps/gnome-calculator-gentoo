@@ -1,0 +1,72 @@
+name: gnome-calculator-gentoo
+version: portage
+version-script: |
+  export EPREFIX="parts/gimpentoo/src"
+  export PATH="${EPREFIX}/usr/bin:${EPREFIX}/bin:$PATH"
+  export ROOT="$SNAPCRAFT_PART_INSTALL"
+  equery gimp
+summary: Gnome Calculator from Gentoo
+description: >
+  Gnome Calculator compiled using Gentoo's portage packaging system.
+
+grade: stable
+confinement: strict
+base: nil
+
+plugs:
+  icon-themes:
+    interface: content
+    target: $SNAP/share/icons
+    default-provider: gtk-common-themes:icon-themes
+  sound-themes:
+    interface: content
+    target: $SNAP/share/sounds
+    default-provider: gtk-common-themes:sounds-themes
+  gtk-3-themes:
+    interface: content
+    target: $SNAP/share/themes
+    default-provider: gtk-common-themes:gtk-3-themes
+
+parts:
+  gnome-calculator:
+    plugin: nil
+    build-packages:
+    - build-essential
+    override-pull: |
+      addgroup --system portage
+      adduser --system --ingroup portage portage
+      unset PERL5LIB
+      export MAKEOPTS="-j$SNAPCRAFT_PARALLEL_BUILD_COUNT"
+      export EPREFIX="$(pwd)"
+      export PATH="${EPREFIX}/usr/bin:${EPREFIX}/bin:${EPREFIX}/tmp/usr/bin:${EPREFIX}/tmp/bin:${PATH}"
+      wget https://gitweb.gentoo.org/repo/proj/prefix.git/plain/scripts/bootstrap-prefix.sh
+      chmod +x bootstrap-prefix.sh
+      ${EPREFIX}/bootstrap-prefix.sh ${EPREFIX} stage1
+      export LATEST_TREE_YES=1
+      ${EPREFIX}/bootstrap-prefix.sh ${EPREFIX} stage2
+      ${EPREFIX}/bootstrap-prefix.sh ${EPREFIX} stage3
+
+      hash -r
+      export USE="minimal"
+      emerge -e @system
+
+      rm -rf ${EPREFIX}/var/spool/* ${EPREFIX}/var/tmp/portage/
+    override-build: |
+      unset PERL5LIB
+      export EPREFIX="$(pwd)"
+      export SHELL=${EPREFIX}/bin/bash
+      RETAIN="HOME=$HOME TERM=$TERM USER=$USER SHELL=$SHELL"
+      RETAIN="ROOT=$SNAPCRAFT_PART_INSTALL $RETAIN"
+      RETAIN="MAKEOPTS=-j$SNAPCRAFT_PARALLEL_BUILD_COUNT $RETAIN"
+
+      env -i $RETAIN $SHELL -l -s <<EOF
+      export USE="minimal"
+      emerge sys-libs/glibc
+      USE="$USE make-symlinks" emerge busybox
+      USE="python $USE" emerge '>=dev-libs/libxml2-2.9.8'
+      USE="vala $USE" emerge dev-libs/libxml2 gnome-extra/gnome-calculator
+      EOF
+
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/icons
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/sounds
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/themes
